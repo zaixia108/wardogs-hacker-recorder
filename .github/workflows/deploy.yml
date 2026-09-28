@@ -1,0 +1,60 @@
+name: 部署到服务器
+
+# 代码合进 main 就自动上线。想手动重发就在 Actions 页面按 "Run workflow"。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server.py"
+      - "seed_counts.py"
+      - "README.md"
+      - "tests/**"
+      - "deploy/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 准备部署私钥
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::仓库里没配 DEPLOY_SSH_KEY 这个 secret，没法 SSH 上去"
+            exit 1
+          fi
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      - name: 推代码 + 重启服务
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: bash deploy/deploy.sh
+
+      - name: 从外网复查（真正的验收）
+        run: |
+          SITE="${{ secrets.SITE_URL || 'https://fxxkwghackers.zaixia108.com/' }}"
+          echo "站点: $SITE"
+          code=$(curl -s -o /tmp/page.html -w '%{http_code}' --max-time 20 "$SITE")
+          echo "首页 HTTP $code"
+          test "$code" = "200" || { echo "::error::首页没返回 200"; exit 1; }
+          grep -q 'class="cell"' /tmp/page.html || { echo "::error::首页里没有登记方框，页面可能没起来"; exit 1; }
+          curl -s --max-time 20 "${SITE%/}/api/list" > /tmp/list.json
+          python3 - <<'PY'
+          import json
+          d = json.load(open('/tmp/list.json'))
+          print(f"阈值 {d['threshold']} · 共 {d['total']} 条 · 判外挂 {d['cheaters']} 个")
+          assert d['threshold'] == 20, "阈值不对，说明线上跑的不是这份代码"
+          assert d['total'] >= 1, "列表空的，数据可能被覆盖了"
+          PY
+          echo "线上接口正常"

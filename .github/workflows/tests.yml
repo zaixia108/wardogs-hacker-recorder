@@ -1,0 +1,51 @@
+name: 回归测试
+
+# 纯 Python 标准库的测试（自己起隔离实例，不碰线上数据）。
+# 真浏览器那条 browser_test.py 要 chromium，没放进 CI，本机跑。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 前端 fmt()（全角转半角那段 JS）要 node 才跑得起来，装上好把它一起验了
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 语法检查
+        run: |
+          python3 -m py_compile server.py seed_counts.py tests/*.py
+          echo "语法 OK"
+
+      - name: 严格 7 位格式 + 页面结构 + 查询接口
+        run: python3 tests/strict_test.py
+
+      - name: 身份去重
+        run: python3 tests/dedupe_test.py
+
+      - name: 起个临时实例（格式化测试得连一个真的在跑的站点）
+        run: |
+          mkdir -p /tmp/fmtd
+          SUSPECT_DATA=/tmp/fmtd/data.json PORT=8797 HOST=127.0.0.1 \
+            nohup python3 server.py > /tmp/fmtd/server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf --max-time 1 http://127.0.0.1:8797/healthz >/dev/null && break
+            sleep 0.5
+          done
+          curl -sf --max-time 2 http://127.0.0.1:8797/healthz && echo " 临时实例起来了（数据落在 /tmp，不碰线上）"
+
+      - name: 全角/横杠格式化
+        env:
+          SUSPECT_DATA: /tmp/fmtd/data.json
+        run: python3 tests/fmt_test.py http://127.0.0.1:8797

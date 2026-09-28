@@ -1,0 +1,12 @@
+# 运行期数据与密钥，坚决不进仓库
+.secret
+data.json
+data.json.bak-*
+
+# 本机专用的取凭据小工具（会读本机会话库），只是我自己部署用
+remote.py
+
+# 杂项
+__pycache__/
+*.pyc
+*.png
