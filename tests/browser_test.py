@@ -261,8 +261,10 @@ def _run() -> None:
                 break
         t = ws.js("document.title")
         check("页面加载", "可疑ID 登记处" in (t or "") and "WARDOGS" in (t or ""), t)
-        check("WARDOGS 元素在场（状态条 / 战场笔记 / 免责页脚）",
-              all(ws.js(f"!!document.querySelector('{s}')") for s in (".opbar", ".tips", ".foot")))
+        check("WARDOGS 元素在场（登记 code 提示 / 战场笔记 / 免责页脚）",
+              all(ws.js(f"!!document.querySelector('{s}')") for s in (".codetip", ".tips", ".foot")))
+        check("顶部 banner 与战场简报已移除",
+              not ws.js("!!document.querySelector('.opbar, .brief')"))
 
         print("\n[1] 指纹")
         fp = ws.js("FP || fingerprint()")

@@ -205,20 +205,15 @@ PAGE = r"""<!DOCTYPE html>
        display:flex;flex-direction:column;align-items:center;padding:24px 16px 56px}
   .stripe{position:fixed;inset:0 0 auto;height:5px;z-index:9;opacity:.8;
        background:repeating-linear-gradient(45deg,var(--susp) 0 10px,#0b0e08 10px 20px)}
-  .opbar{width:100%;max-width:720px;display:flex;gap:4px 14px;flex-wrap:wrap;align-items:center;
-       font:600 11px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:1.4px;
-       text-transform:uppercase;color:var(--olive);border-bottom:1px dashed var(--line);
-       padding-bottom:10px;margin-bottom:18px}
-  .opbar b{color:var(--fg)}
-  .opbar .live{color:var(--ok);margin-left:auto}
   h1{margin:0 0 8px;font-size:27px;letter-spacing:1.5px;text-align:center;font-weight:800}
   h1 .en{color:var(--susp)}
   .sub{color:var(--dim);font-size:13px;margin-bottom:14px;text-align:center}
   .sub b{color:var(--fg)}
-  .brief{width:100%;max-width:720px;font-size:13px;line-height:1.8;color:var(--dim);
-       border-left:3px solid var(--susp);background:rgba(224,169,27,.055);
-       padding:10px 14px;margin:0 0 20px}
-  .brief b{color:var(--fg)}
+  .codetip{width:100%;max-width:720px;font-size:13.5px;line-height:1.85;color:var(--fg);
+       border-left:3px solid var(--susp);background:rgba(224,169,27,.06);
+       padding:11px 14px;margin:0 0 18px}
+  .codetip b{color:var(--susp)}
+  .codetip .mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:1px;color:var(--fg)}
   .card{position:relative;width:100%;max-width:720px;background:linear-gradient(180deg,#161d12,#11160d);
        border:1px solid var(--line);border-radius:6px;padding:18px;margin-bottom:12px;
        box-shadow:0 12px 30px rgba(0,0,0,.45)}
@@ -300,24 +295,16 @@ PAGE = r"""<!DOCTYPE html>
 <body>
 <div class="stripe"></div>
 
-<div class="opbar">
-  <span><b>WARDOGS</b> · ALL-OUT WARFARE</span>
-  <span>SECTOR KAVKAZI</span>
-  <span>3 阵营 · 100 人</span>
-  <span>CONTROL ZONE 2×2 KM</span>
-  <span class="live">◆ STATUS: ONLINE</span>
-</div>
-
 <h1><span class="en">WARDOGS</span> 可疑ID 登记处</h1>
-<div class="sub">LONESTAR · VALKYRA · MANTICORE ｜ 登记一次 = 一次怀疑 · 同一个 ID 被登记超过 <span id="th">20</span> 次 → 判定为「外挂」</div>
+<div class="sub">登记一次 = 一次怀疑 · 同一个 ID 被登记超过 <span id="th">20</span> 次 → 判定为「外挂」</div>
 
-<div class="brief">
-  <b>战场简报：</b>一局最多 100 人分三阵营，抢 2×2 km 的 Control Zone，每 30 秒记一分，先到 100 分取胜；每人起始 $10,000，装备现买现用。
-  这里也是一张记分表 —— <b>同一个 ID 被登记一次算一次怀疑，超过 20 次判定为「外挂」</b>，登记结果所有人可见。
+<div class="codetip">
+  <b>登记 code：</b>就是<b>积分版上玩家名字右侧的那 7 个字</b>（例：<span class="mono">2VDE-THE</span>）——
+  填进下面的方框就行，中间的横线会自动带上。
 </div>
 
 <div class="card">
-  <div class="fl">// 目标 ID · TARGET</div>
+  <div class="fl">// 登记 code</div>
   <div class="row">
     <div class="cells" id="idcells" aria-label="7 位玩家 ID">
       <input class="cell" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false">
@@ -331,7 +318,7 @@ PAGE = r"""<!DOCTYPE html>
     </div>
     <button id="btn">登记为可疑ID</button>
   </div>
-  <div class="msg" id="msg">输入 7 位 ID，中间的横线会自动带上（例：2VDE-THE）。</div>
+  <div class="msg" id="msg">输入 7 位 code（积分版上玩家名字右侧那 7 个字），中间的横线会自动带上。</div>
 </div>
 
 <div class="card qcard">
@@ -373,7 +360,7 @@ PAGE = r"""<!DOCTYPE html>
 </div>
 
 <div class="foot">
-  <div><b>关于 WARDOGS：</b>BULKHEAD 开发、Team17 发行的 100 人三阵营全兵种 FPS；Control Zone 每 30 秒记一分，先到 100 分取胜；官方反作弊是内核级的 Elytra。</div>
+  <div><b>关于 WARDOGS：</b>BULKHEAD 开发、Team17 发行的 100 人三阵营（Lonestar / Valkyra / Manticore）全兵种 FPS；Control Zone 每 30 秒记一分，先到 100 分取胜；官方反作弊是内核级的 Elytra。</div>
   <div class="warnline">真正的举报请走<b>游戏内 Report</b>（见 wardogs.com/enforcement）—— 官方才会处理账号。本站只是玩家自建的公共登记本，不能代替官方举报。</div>
   <div>玩家自建工具，与 BULKHEAD、Team17 无关联，未获其背书；WARDOGS 及相关名称与商标归其各自所有者。</div>
 </div>
@@ -458,7 +445,7 @@ async function refresh(){
 
 const ID_RE = /^[A-Z0-9]{4}-[A-Z0-9]{3}$/;   // 严格 7 位，与后端 ID_RE 同一套
 const ID_ERR = 'ID 格式不对：必须是 7 位（4 位字母/数字 + - + 3 位字母/数字，如 2VDE-THE）';
-const HINT = '输入 7 位 ID，中间的横线会自动带上（例：2VDE-THE）。';
+const HINT = '输入 7 位 code（积分版上玩家名字右侧那 7 个字），中间的横线会自动带上。';
 function setMsg(text, cls){ const m = $('#msg'); m.className = 'msg' + (cls ? ' ' + cls : ''); m.textContent = text || HINT; }
 const QHINT = '输入一个 ID，查询它被登记了多少次。';
 function setQMsg(text, cls){ const m = $('#qmsg'); m.className = 'msg' + (cls ? ' ' + cls : ''); m.textContent = text || QHINT; }
