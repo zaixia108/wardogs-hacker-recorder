@@ -259,7 +259,10 @@ def _run() -> None:
             time.sleep(0.25)
             if ws.js("document.readyState") == "complete":
                 break
-        check("页面加载", ws.js("document.title") == "可疑ID 登记处", ws.js("document.title"))
+        t = ws.js("document.title")
+        check("页面加载", "可疑ID 登记处" in (t or "") and "WARDOGS" in (t or ""), t)
+        check("WARDOGS 元素在场（状态条 / 战场笔记 / 免责页脚）",
+              all(ws.js(f"!!document.querySelector('{s}')") for s in (".opbar", ".tips", ".foot")))
 
         print("\n[1] 指纹")
         fp = ws.js("FP || fingerprint()")

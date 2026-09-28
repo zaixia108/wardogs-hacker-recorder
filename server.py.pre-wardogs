@@ -188,136 +188,62 @@ PAGE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WARDOGS · 可疑ID 登记处</title>
-<meta name="description" content="WARDOGS 可疑ID 登记处：把对局里可疑的玩家 ID 登记下来，同一个 ID 被登记超过 20 次判定为「外挂」。">
-<meta name="theme-color" content="#0b0e08">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b0e08'/%3E%3Cpath d='M10 6h12v12l-6 8-6-8z' fill='%23e0a91b'/%3E%3Ccircle cx='16' cy='11' r='2' fill='%230b0e08'/%3E%3C/svg%3E">
+<title>可疑ID 登记处</title>
 <style>
-  :root{--bg:#0b0e08;--card:#141a10;--line:#2b3320;--fg:#e9e7dc;--dim:#98a184;
-        --susp:#e0a91b;--cheat:#e5484d;--ok:#8fbf5a;--olive:#7d8c52}
+  :root{--bg:#0d1117;--card:#161b22;--line:#262d38;--fg:#e6edf3;--dim:#8b949e;
+        --susp:#d29922;--cheat:#f85149;--ok:#3fb950}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;color:var(--fg);
-       background:radial-gradient(1100px 560px at 50% -12%,#1c2415,#0b0e08 62%),
-                  repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 40px),
-                  repeating-linear-gradient(90deg,rgba(255,255,255,.022) 0 1px,transparent 1px 40px),
-                  #0b0e08;
-       font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-       display:flex;flex-direction:column;align-items:center;padding:24px 16px 56px}
-  .stripe{position:fixed;inset:0 0 auto;height:5px;z-index:9;opacity:.8;
-       background:repeating-linear-gradient(45deg,var(--susp) 0 10px,#0b0e08 10px 20px)}
-  .opbar{width:100%;max-width:720px;display:flex;gap:4px 14px;flex-wrap:wrap;align-items:center;
-       font:600 11px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:1.4px;
-       text-transform:uppercase;color:var(--olive);border-bottom:1px dashed var(--line);
-       padding-bottom:10px;margin-bottom:18px}
-  .opbar b{color:var(--fg)}
-  .opbar .live{color:var(--ok);margin-left:auto}
-  h1{margin:0 0 8px;font-size:27px;letter-spacing:1.5px;text-align:center;font-weight:800}
-  h1 .en{color:var(--susp)}
-  .sub{color:var(--dim);font-size:13px;margin-bottom:14px;text-align:center}
-  .sub b{color:var(--fg)}
-  .brief{width:100%;max-width:720px;font-size:13px;line-height:1.8;color:var(--dim);
-       border-left:3px solid var(--susp);background:rgba(224,169,27,.055);
-       padding:10px 14px;margin:0 0 20px}
-  .brief b{color:var(--fg)}
-  .card{position:relative;width:100%;max-width:720px;background:linear-gradient(180deg,#161d12,#11160d);
-       border:1px solid var(--line);border-radius:6px;padding:18px;margin-bottom:12px;
-       box-shadow:0 12px 30px rgba(0,0,0,.45)}
-  .card::before,.card::after{content:"";position:absolute;width:13px;height:13px;
-       border:2px solid var(--olive);opacity:.9}
-  .card::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
-  .card::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
-  .fl{font:700 10px/1 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:2px;
-       text-transform:uppercase;color:var(--olive);margin-bottom:10px}
-  .fl.wide{width:100%;max-width:720px;margin:22px 0 8px}
+  body{margin:0;min-height:100vh;background:radial-gradient(1200px 600px at 50% -10%,#1b2430,#0d1117 60%);
+       color:var(--fg);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       display:flex;flex-direction:column;align-items:center;padding:32px 16px 64px}
+  h1{margin:0 0 6px;font-size:26px;letter-spacing:.5px}
+  .sub{color:var(--dim);font-size:13px;margin-bottom:24px;text-align:center}
+  .card{width:100%;max-width:720px;background:var(--card);border:1px solid var(--line);
+        border-radius:14px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
   .row{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
   .cells{display:flex;align-items:center;gap:8px}
   .cells .cell{flex:0 0 auto;width:46px;height:58px;padding:0;text-align:center;
-       background:#090c06;border:1px solid var(--line);border-radius:4px;color:var(--fg);
-       font:700 24px/1 ui-monospace,SFMono-Regular,Consolas,monospace;
-       box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
-  .cells .cell:focus{outline:none;border-color:var(--susp);box-shadow:0 0 0 3px rgba(224,169,27,.16)}
-  .cells .dash{flex:0 0 auto;width:18px;text-align:center;color:var(--susp);user-select:none;
-       font:700 22px/1 ui-monospace,SFMono-Regular,Consolas,monospace}
-  input{flex:1;min-width:0;background:#090c06;border:1px solid var(--line);border-radius:4px;
-       padding:14px;color:var(--fg);font-size:16px;
-       font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+        font:700 24px/1 ui-monospace,SFMono-Regular,Consolas,monospace}
+  .cells .cell:focus{border-color:var(--susp);box-shadow:0 0 0 3px rgba(240,180,41,.15)}
+  .cells .dash{flex:0 0 auto;width:18px;text-align:center;color:var(--dim);user-select:none;
+        font:700 22px/1 ui-monospace,SFMono-Regular,Consolas,monospace}
+  input{flex:1;min-width:0;background:#0d1117;border:1px solid var(--line);border-radius:10px;
+        padding:14px 14px;color:var(--fg);font-size:16px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
   input:focus{outline:none;border-color:var(--susp)}
-  button{background:linear-gradient(180deg,#f0b429,#cf9410);color:#17130a;border:0;border-radius:4px;
-       padding:0 22px;font-size:15px;font-weight:800;letter-spacing:1px;cursor:pointer;white-space:nowrap}
+  button{background:#f0b429;color:#1a1400;border:0;border-radius:10px;padding:0 22px;
+         font-size:16px;font-weight:700;cursor:pointer;white-space:nowrap}
   button:active{transform:translateY(1px)}
-  button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
-  button.ghost:hover{border-color:var(--olive)}
   .msg{min-height:20px;font-size:13px;margin-top:10px;color:var(--dim)}
   .msg.err{color:var(--cheat)}
   .msg.warn{color:var(--susp)}
   .msg.ok{color:var(--ok)}
+  .qcard{margin-top:8px}
+  button.ghost{background:#21262d;color:var(--fg);border:1px solid var(--line)}
   .qres{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--fg)}
   .stats{display:flex;gap:18px;flex-wrap:wrap;color:var(--dim);font-size:13px;
-       width:100%;max-width:720px;margin:0 0 14px}
+         margin:22px 0 10px;width:100%;max-width:720px}
   .stats b{color:var(--fg)}
   ul{list-style:none;padding:0;margin:0;width:100%;max-width:720px}
-  li{background:linear-gradient(180deg,#161d12,#11160d);border:1px solid var(--line);border-radius:4px;
-       border-left:3px solid var(--olive);padding:12px 14px;margin-bottom:8px;
-       display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-  li.cheat{border-color:rgba(229,72,77,.6);background:linear-gradient(90deg,rgba(229,72,77,.14),#131810 42%)}
-  li.cheat .name{color:#ffd7d7}
-  .name{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:16px;flex:1;
-       min-width:140px;word-break:break-all;letter-spacing:1px}
-  .name::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;
-       border:1px solid var(--olive);border-radius:50%;vertical-align:1px}
-  li.cheat .name::before{border-color:var(--cheat)}
+  li{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;
+     display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  li.cheat{border-color:rgba(248,81,73,.55);background:linear-gradient(90deg,rgba(248,81,73,.10),var(--card) 45%)}
+  .name{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:16px;flex:1;min-width:140px;
+        word-break:break-all}
   .cnt{color:var(--dim);font-size:13px;font-variant-numeric:tabular-nums}
-  .bar{width:100%;height:5px;border-radius:2px;background:#0a0d07;overflow:hidden;margin-top:8px;flex-basis:100%}
-  .bar i{display:block;height:100%;background:linear-gradient(90deg,#8a6d10,var(--susp))}
-  li.cheat .bar i{background:linear-gradient(90deg,#8f2020,var(--cheat))}
-  .tag{font-size:12px;font-weight:800;padding:4px 10px;border-radius:3px;white-space:nowrap;letter-spacing:.5px}
-  .tag.susp{color:var(--susp);border:1px solid rgba(224,169,27,.5);background:rgba(224,169,27,.10)}
+  .bar{width:100%;height:4px;border-radius:3px;background:#0d1117;overflow:hidden;margin-top:8px;flex-basis:100%}
+  .bar i{display:block;height:100%;background:var(--susp)}
+  li.cheat .bar i{background:var(--cheat)}
+  .tag{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .tag.susp{color:var(--susp);border:1px solid rgba(210,153,34,.45);background:rgba(210,153,34,.10)}
   .tag.cheat{color:#fff;background:var(--cheat)}
-  .stamp{font:700 10px/1 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:2px;
-       color:rgba(229,72,77,.9);border:1px dashed rgba(229,72,77,.6);padding:3px 6px;
-       border-radius:3px;transform:rotate(-2deg)}
-  .empty{color:var(--dim);text-align:center;padding:28px 0;font-size:14px;
-       border:1px dashed var(--line);border-radius:4px}
-  .tips{width:100%;max-width:720px;margin:26px 0 0;font-size:13px;line-height:1.85;color:var(--dim);
-       border-top:1px dashed var(--line);padding-top:14px}
-  .tips b{color:var(--fg)}
-  .tips ul{margin:6px 0 0}
-  .tips li{background:none;border:0;border-left:2px solid var(--olive);border-radius:0;
-       padding:0 0 0 10px;margin:0 0 6px;display:block;font-size:13px;color:var(--dim)}
-  .foot{width:100%;max-width:720px;margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
-       color:var(--dim);font-size:11.5px;line-height:1.9}
-  .foot b{color:var(--fg)}
-  .foot .warnline{color:rgba(224,169,27,.9)}
-  @media (max-width:430px){
-    .cells{gap:5px}
-    .cells .cell{width:38px;height:50px;font-size:20px}
-    .cells .dash{width:12px;font-size:18px}
-    h1{font-size:22px}
-    li{gap:8px}
-  }
+  .empty{color:var(--dim);text-align:center;padding:28px 0;font-size:14px}
 </style>
 </head>
 <body>
-<div class="stripe"></div>
-
-<div class="opbar">
-  <span><b>WARDOGS</b> · ALL-OUT WARFARE</span>
-  <span>SECTOR KAVKAZI</span>
-  <span>3 阵营 · 100 人</span>
-  <span>CONTROL ZONE 2×2 KM</span>
-  <span class="live">◆ STATUS: ONLINE</span>
-</div>
-
-<h1><span class="en">WARDOGS</span> 可疑ID 登记处</h1>
-<div class="sub">LONESTAR · VALKYRA · MANTICORE ｜ 登记一次 = 一次怀疑 · 同一个 ID 被登记超过 <span id="th">20</span> 次 → 判定为「外挂」</div>
-
-<div class="brief">
-  <b>战场简报：</b>一局最多 100 人分三阵营，抢 2×2 km 的 Control Zone，每 30 秒记一分，先到 100 分取胜；每人起始 $10,000，装备现买现用。
-  这里也是一张记分表 —— <b>同一个 ID 被登记一次算一次怀疑，超过 20 次判定为「外挂」</b>，登记结果所有人可见。
-</div>
+<h1>可疑ID 登记处</h1>
+<div class="sub">登记一次 = 一次怀疑 · 同一个 ID 被登记超过 <span id="th">20</span> 次 → 判定为「外挂」</div>
 
 <div class="card">
-  <div class="fl">// 目标 ID · TARGET</div>
   <div class="row">
     <div class="cells" id="idcells" aria-label="7 位玩家 ID">
       <input class="cell" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false">
@@ -335,7 +261,6 @@ PAGE = r"""<!DOCTYPE html>
 </div>
 
 <div class="card qcard">
-  <div class="fl">// 查询登记次数 · QUERY</div>
   <div class="row">
     <div class="cells" id="qcells" aria-label="7 位玩家 ID（查询）">
       <input class="cell" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false">
@@ -352,31 +277,12 @@ PAGE = r"""<!DOCTYPE html>
   <div class="msg" id="qmsg">输入一个 ID，查询它被登记了多少次。</div>
 </div>
 
-<div class="fl wide">// 战场记录 · FIELD LOG</div>
-
 <div class="stats">
   <span>已登记 <b id="s-total">0</b> 个 ID</span>
   <span>判定为外挂 <b id="s-cheat">0</b> 个</span>
-  <span>阈值 &gt; 20 次自动判定</span>
 </div>
 
 <ul id="list"></ul>
-
-<div class="tips">
-  <b>// 战场笔记 · FIELD NOTES</b>
-  <ul>
-    <li>这游戏<b>不给敌人标记</b>：能隔着三堵墙、穿过烟幕把人点名的人，最值得登记一条。</li>
-    <li>挂也爱钻 <b>Hot Zone</b>（现金双倍）—— 人多的热点，同一局里撞见同一个 ID 的概率最高。</li>
-    <li>登记是匿名的：服务端只存加盐哈希，不记 IP、不记你的游戏 ID。</li>
-    <li>判定只看次数：<b>登记数超过 20 次即标「外挂」</b>，不代表官方结论。</li>
-  </ul>
-</div>
-
-<div class="foot">
-  <div><b>关于 WARDOGS：</b>BULKHEAD 开发、Team17 发行的 100 人三阵营全兵种 FPS；Control Zone 每 30 秒记一分，先到 100 分取胜；官方反作弊是内核级的 Elytra。</div>
-  <div class="warnline">真正的举报请走<b>游戏内 Report</b>（见 wardogs.com/enforcement）—— 官方才会处理账号。本站只是玩家自建的公共登记本，不能代替官方举报。</div>
-  <div>玩家自建工具，与 BULKHEAD、Team17 无关联，未获其背书；WARDOGS 及相关名称与商标归其各自所有者。</div>
-</div>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -392,7 +298,6 @@ function render(d){
     const pct = Math.min(100, r.count / d.threshold * 100);
     return `<li class="${r.cheater?'cheat':''}">
       <span class="name">${esc(r.id)}</span>
-      ${r.cheater?'<span class="stamp">CHEATER</span>':''}
       <span class="cnt">${r.count} / ${d.threshold}</span>
       <span class="tag ${r.cheater?'cheat':'susp'}">${r.cheater?'外挂':'可疑ID'}</span>
       <span class="bar"><i style="width:${pct}%"></i></span>
@@ -481,7 +386,7 @@ async function submit(){
     }
     else{
       setMsg(d.cheater
-        ? `「${d.id}」已登记 ${d.count} 次 —— 判定为外挂 · CHEATER`
+        ? `「${d.id}」已登记 ${d.count} 次 —— 判定为外挂 ✅`
         : `已登记「${d.id}」，当前 ${d.count} 次怀疑`);
       reg.clear();
       focusCell(0);
