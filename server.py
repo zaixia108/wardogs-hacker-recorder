@@ -223,9 +223,9 @@ def register(raw: str, sid: str | None = None, fp: str | None = None, ip: str | 
     """
     name = format_id(raw)
     if not name:
-        return None, "请输入要登记的 ID", False
+        return None, "请输入要登记的 ID", False, "empty"
     if not ID_RE.fullmatch(name):        # 严格 7 位，不合规不登记
-        return None, ID_ERR, False
+        return None, ID_ERR, False, "id"
     key = name.lower()
     toks = identity_tokens(sid, fp)
     bucket = ip_bucket(ip)
@@ -234,7 +234,7 @@ def register(raw: str, sid: str | None = None, fp: str | None = None, ip: str | 
         if not left:
             # 今天的额度用完了：不新建记录也不加数。攒次数靠不同的人，不是同一个人猛点。
             return None, (f"这个网络今天登记满了（每天 {DAILY_CAP} 次），明天再来 —— "
-                          "登记次数要靠不同的人攒。"), False
+                          "登记次数要靠不同的人攒。"), False, "quota"
         rec = _state["ids"].get(key)
         now = time.time()
         if rec is None:
@@ -242,7 +242,7 @@ def register(raw: str, sid: str | None = None, fp: str | None = None, ip: str | 
             _state["ids"][key] = rec
         voters = rec.setdefault("voters", [])
         if toks and any(t in voters for t in toks):
-            return None, "这个 ID 你已经登记过了", True
+            return None, "这个 ID 你已经登记过了", True, "dup"
         rec["count"] = int(rec.get("count", 0)) + 1
         rec["last"] = now
         for t in toks:
@@ -250,7 +250,7 @@ def register(raw: str, sid: str | None = None, fp: str | None = None, ip: str | 
         take_quota(bucket)
         save()
         return {"id": rec["display"], "count": rec["count"],
-                "cheater": rec["count"] > THRESHOLD}, None, False
+                "cheater": rec["count"] > THRESHOLD}, None, False, None
 
 
 PAGE = r"""<!DOCTYPE html>
@@ -289,6 +289,12 @@ PAGE = r"""<!DOCTYPE html>
        background:repeating-linear-gradient(45deg,var(--susp) 0 10px,#0b0e08 10px 20px)}
   h1{margin:0 0 8px;font-size:27px;letter-spacing:1.5px;text-align:center;font-weight:800}
   h1 .en{color:var(--susp)}
+  .langsw{display:flex;gap:6px;justify-content:center;margin:0 0 12px}
+  .langsw button{padding:4px 12px;font-size:12px;letter-spacing:.5px;font-weight:700;
+       background:transparent;color:var(--dim);border:1px solid var(--line);border-radius:3px;
+       cursor:pointer;white-space:nowrap}
+  .langsw button:hover{border-color:var(--olive)}
+  .langsw button.on{color:var(--susp);border-color:rgba(224,169,27,.55);background:rgba(224,169,27,.08)}
   .sub{color:var(--dim);font-size:13px;margin-bottom:14px;text-align:center}
   .sub b{color:var(--fg)}
   .codetip{width:100%;max-width:720px;font-size:13.5px;line-height:1.85;color:var(--fg);
@@ -381,84 +387,280 @@ PAGE = r"""<!DOCTYPE html>
 <body>
 <div class="stripe"></div>
 
-<h1><span class="en">WARDOGS</span> 可疑ID 登记处</h1>
-<div class="sub">登记一次 = 一次怀疑 · 同一个 ID 被登记超过 <span id="th">20</span> 次 → 判定为「外挂」</div>
-
-<div class="codetip">
-  <b>登记 code：</b>就是<b>积分版上玩家名字右侧的那 7 个字</b>（例：<span class="mono">2VDE-THE</span>）——
-  填进下面的方框就行，中间的横线会自动带上。
+<h1><span class="en">WARDOGS</span> <span data-i18n="h1_rest">可疑ID 登记处</span></h1>
+<div class="langsw" role="group" aria-label="Language">
+  <button type="button" data-lang="zh">中文</button>
+  <button type="button" data-lang="en">EN</button>
+  <button type="button" data-lang="ru">RU</button>
 </div>
+<div class="sub" data-i18n-html="sub">登记一次 = 一次怀疑 · 同一个 ID 被登记超过 <span id="th">20</span> 次 → 判定为「外挂」</div>
+
+<div class="codetip" data-i18n-html="codetip"><b>登记 code：</b>就是<b>积分版上玩家名字右侧的那 7 个字</b>（例：<span class="mono">2VDE-THE</span>）—— 填进下面的方框就行，中间的横线会自动带上。</div>
 
 <div class="card">
-  <div class="fl">// 登记 / 查询 code</div>
+  <div class="fl" data-i18n="fl_input">// 登记 / 查询 code</div>
   <div class="row">
     <div class="cells" id="idcells" aria-label="7 位玩家 code">
-      <input class="cell" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 1 位">
-      <input class="cell" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 2 位">
-      <input class="cell" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 3 位">
-      <input class="cell" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 4 位">
+      <input class="cell" data-n="0" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 1 位">
+      <input class="cell" data-n="1" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 2 位">
+      <input class="cell" data-n="2" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 3 位">
+      <input class="cell" data-n="3" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 4 位">
       <span class="dash">-</span>
-      <input class="cell" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 5 位">
-      <input class="cell" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 6 位">
-      <input class="cell" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 7 位">
+      <input class="cell" data-n="4" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 5 位">
+      <input class="cell" data-n="5" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 6 位">
+      <input class="cell" data-n="6" maxlength="1" inputmode="latin" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-label="第 7 位">
     </div>
     <div class="btns">
-      <button id="qbtn" class="ghost">查询</button>
-      <button id="btn">登记为可疑</button>
+      <button id="qbtn" class="ghost" data-i18n="btn_query">查询</button>
+      <button id="btn" data-i18n="btn_register">登记为可疑</button>
     </div>
   </div>
   <div class="msg" id="msg">先查一眼：已经有人登记过就不用再填；没查到的话，看清了就直接登记。</div>
   <div class="sim" id="sim"></div>
 </div>
 
-<div class="fl wide">// 战场记录 · FIELD LOG</div>
+<div class="fl wide" data-i18n="fl_log">// 战场记录 · FIELD LOG</div>
 
 <div class="stats">
-  <span>已登记 <b id="s-total">0</b> 个 code</span>
-  <span>累计登记 <b id="s-reg">0</b> 次</span>
-  <span>判定为外挂 <b id="s-cheat">0</b> 个</span>
-  <span>阈值 &gt; 20 次自动判定</span>
+  <span id="w-total">已登记 <b id="s-total">0</b> 个 code</span>
+  <span id="w-reg">累计登记 <b id="s-reg">0</b> 次</span>
+  <span id="w-cheat">判定为外挂 <b id="s-cheat">0</b> 个</span>
+  <span id="w-th">阈值 &gt; 20 次自动判定</span>
   <span id="s-quota-wrap" hidden>今日还能登记 <b id="s-quota">0</b> 次</span>
 </div>
 
 <ul id="list"></ul>
 
 <div class="tips">
-  <b>// 战场笔记 · FIELD NOTES</b>
+  <b data-i18n="fl_notes">// 战场笔记 · FIELD NOTES</b>
   <ul>
-    <li>这游戏<b>不给敌人标记</b>：能隔着三堵墙、穿过烟幕把人点名的人，最值得登记一条。</li>
-    <li>挂也爱钻 <b>Hot Zone</b>（现金双倍）—— 人多的热点，同一局里撞见同一个 ID 的概率最高。</li>
-    <li>登记前<b>核对一遍</b>：错一位就是另一个 code，而且登记了<b>没法撤回</b>。</li>
-    <li>登记是匿名的：服务端只存加盐哈希，不记你的游戏 ID；限次用的也只是 IP 的哈希。</li>
-    <li>防刷：<b>同一个网络每天最多登记 5 次</b> —— 次数要靠不同的人攒，一个人点不满。</li>
-    <li>判定只看次数：<b>登记数超过 20 次即标「外挂」</b>，不代表官方结论。</li>
+    <li data-i18n-html="tip1">这游戏<b>不给敌人标记</b>：能隔着三堵墙、穿过烟幕把人点名的人，最值得登记一条。</li>
+    <li data-i18n-html="tip2">挂也爱钻 <b>Hot Zone</b>（现金双倍）—— 人多的热点，同一局里撞见同一个 ID 的概率最高。</li>
+    <li data-i18n-html="tip3">登记前<b>核对一遍</b>：错一位就是另一个 code，而且登记了<b>没法撤回</b>。</li>
+    <li data-i18n-html="tip4">登记是匿名的：服务端只存加盐哈希，不记你的游戏 ID；限次用的也只是 IP 的哈希。</li>
+    <li data-i18n-html="tip5">防刷：<b>同一个网络每天最多登记 5 次</b> —— 次数要靠不同的人攒，一个人点不满。</li>
+    <li data-i18n-html="tip6">判定只看次数：<b>登记数超过 20 次即标「外挂」</b>，不代表官方结论。</li>
   </ul>
 </div>
 
 <div class="foot">
-  <div><b>关于 WARDOGS：</b>BULKHEAD 开发、Team17 发行的 100 人三阵营（Lonestar / Valkyra / Manticore）全兵种 FPS；Control Zone 每 30 秒记一分，先到 100 分取胜；官方反作弊是内核级的 Elytra。</div>
-  <div class="warnline">真正的举报请走<b>游戏内 Report</b>（见 wardogs.com/enforcement）—— 官方才会处理账号。本站只是玩家自建的公共登记本，不能代替官方举报。</div>
-  <div>玩家自建工具，与 BULKHEAD、Team17 无关联，未获其背书；WARDOGS 及相关名称与商标归其各自所有者。</div>
+  <div data-i18n-html="foot1"><b>关于 WARDOGS：</b>BULKHEAD 开发、Team17 发行的 100 人三阵营（Lonestar / Valkyra / Manticore）全兵种 FPS；Control Zone 每 30 秒记一分，先到 100 分取胜；官方反作弊是内核级的 Elytra。</div>
+  <div class="warnline" data-i18n-html="foot2">真正的举报请走<b>游戏内 Report</b>（见 wardogs.com/enforcement）—— 官方才会处理账号。本站只是玩家自建的公共登记本，不能代替官方举报。</div>
+  <div data-i18n-html="foot3">玩家自建工具，与 BULKHEAD、Team17 无关联，未获其背书；WARDOGS 及相关名称与商标归其各自所有者。</div>
 </div>
-
 <script>
 const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
 const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+// ---------- 多语言：zh / en / ru。语言存本地，切换不发请求、不重新输 ----------
+const I18N = {
+zh: {
+  langattr:'zh-CN',
+  title:'WARDOGS · 可疑ID 登记处',
+  desc:'WARDOGS 可疑ID 登记处：把对局里可疑的玩家 ID 登记下来，同一个 ID 被登记超过 20 次判定为「外挂」。',
+  og_desc:'名字可以顶，CODE 顶不掉。把对局里可疑玩家的 7 位 code 登记下来，同一个 code 超过 20 次自动标红。',
+  tw_desc:'名字可以顶，CODE 顶不掉。可疑玩家的 7 位 code 登记在这里，超过 20 次自动标红。',
+  h1_rest:'可疑ID 登记处',
+  sub:'登记一次 = 一次怀疑 · 同一个 ID 被登记超过 <span id="th">20</span> 次 → 判定为「外挂」',
+  codetip:'<b>登记 code：</b>就是<b>积分版上玩家名字右侧的那 7 个字</b>（例：<span class="mono">2VDE-THE</span>）—— 填进下面的方框就行，中间的横线会自动带上。',
+  fl_input:'// 登记 / 查询 code',
+  cells_aria:'7 位玩家 code', cell:(n)=>'第 '+n+' 位',
+  btn_query:'查询', btn_register:'登记为可疑',
+  msg_hint:'先查一眼：已经有人登记过就不用再填；没查到的话，看清了就直接登记。',
+  fl_log:'// 战场记录 · FIELD LOG',
+  stat_total:['已登记 ',' 个 code'], stat_reg:['累计登记 ',' 次'],
+  stat_cheat:['判定为外挂 ',' 个'], stat_th:'阈值 > 20 次自动判定',
+  stat_quota:['今日还能登记 ',' 次'],
+  fl_notes:'// 战场笔记 · FIELD NOTES',
+  tip1:'这游戏<b>不给敌人标记</b>：能隔着三堵墙、穿过烟幕把人点名的人，最值得登记一条。',
+  tip2:'挂也爱钻 <b>Hot Zone</b>（现金双倍）—— 人多的热点，同一局里撞见同一个 ID 的概率最高。',
+  tip3:'登记前<b>核对一遍</b>：错一位就是另一个 code，而且登记了<b>没法撤回</b>。',
+  tip4:'登记是匿名的：服务端只存加盐哈希，不记你的游戏 ID；限次用的也只是 IP 的哈希。',
+  tip5:'防刷：<b>同一个网络每天最多登记 5 次</b> —— 次数要靠不同的人攒，一个人点不满。',
+  tip6:'判定只看次数：<b>登记数超过 20 次即标「外挂」</b>，不代表官方结论。',
+  foot1:'<b>关于 WARDOGS：</b>BULKHEAD 开发、Team17 发行的 100 人三阵营（Lonestar / Valkyra / Manticore）全兵种 FPS；Control Zone 每 30 秒记一分，先到 100 分取胜；官方反作弊是内核级的 Elytra。',
+  foot2:'真正的举报请走<b>游戏内 Report</b>（见 wardogs.com/enforcement）—— 官方才会处理账号。本站只是玩家自建的公共登记本，不能代替官方举报。',
+  foot3:'玩家自建工具，与 BULKHEAD、Team17 无关联，未获其背书；WARDOGS 及相关名称与商标归其各自所有者。',
+  ago:['刚刚','%d 分钟前','%d 小时前','%d 天前'],
+  empty:'还没有人上榜。', tag_susp:'可疑ID', tag_cheat:'外挂', last_pre:'最近 ',
+  live_registered:(v,c,l,ch)=>'「'+v+'」已被登记 '+c+' 次'+(l?' · 最近 '+l:'')+(ch?' · 已判定外挂':'')+' —— 不用再登记，一个人头只能算一次',
+  live_similar:(list)=>'板上还有只差 1~2 个字符的 '+list+' —— 看清再登记，登记了没法撤回',
+  need_n:(k)=>'还差 '+k+' 位 —— 一共 7 位（4 位 + 3 位，例：2VDE-THE）',
+  id_err:'ID 格式不对：必须是 7 位（4 位字母/数字 + - + 3 位字母/数字，如 2VDE-THE）',
+  e_empty:'请输入要登记的 ID',
+  e_quota:(k)=>'这个网络今天登记满了（每天 '+k+' 次），明天再来 —— 登记次数要靠不同的人攒。',
+  e_dup:'这个 ID 你已经登记过了', e_fail:'登记失败', e_badreq:'请求格式错误', e_qfail:'查询失败',
+  q_notfound:(v)=>'「'+v+'」还没有被登记过 —— 如果你确实看到了可疑行为，点旁边的「登记为可疑」，它就是第一条',
+  q_found:(v,c,t,j,l)=>'「'+v+'」已被登记 '+c+' 次（阈值 '+t+'）· 判定：'+j+(l?' · 最近 '+l:''),
+  verdict_cheat:'外挂', verdict_susp:'可疑ID',
+  ok_reg:(v,c,ch)=>ch?('「'+v+'」已登记 '+c+' 次 —— 判定为外挂 · CHEATER'):('已登记「'+v+'」，当前 '+c+' 次怀疑'),
+  net_err:(m)=>'网络错误：'+m,
+},
+en: {
+  langattr:'en',
+  title:'WARDOGS · Suspect CODE Registry',
+  desc:'WARDOGS suspect CODE registry: log the 7-character code of suspicious players you meet in matches. Once the same code is logged more than 20 times it is flagged as a CHEATER.',
+  og_desc:'Display names can be faked. The CODE cannot. Log suspicious 7-character codes from your matches — 20+ logs flags a cheater.',
+  tw_desc:'Display names can be faked. The CODE cannot. Suspicious player codes logged here; 20+ logs auto-flag as cheater.',
+  h1_rest:'Suspect CODE Registry',
+  sub:'One log = one suspicion · a code logged more than <span id="th">20</span> times → flagged as <b>CHEATER</b>',
+  codetip:'<b>The CODE:</b> the <b>7 characters to the right of a player\'s name on the scoreboard</b> (example: <span class="mono">2VDE-THE</span>). Type it into the boxes below — the dash is added automatically.',
+  fl_input:'// LOG / LOOK UP A CODE',
+  cells_aria:'7-character player code', cell:(n)=>'character '+n,
+  btn_query:'Look up', btn_register:'Log as suspect',
+  msg_hint:'Look it up first: if it is already logged, no need to add yours. If not — check twice, then log it.',
+  fl_log:'// FIELD LOG',
+  stat_total:['Codes on board: ',''], stat_reg:['Total logs: ',''],
+  stat_cheat:['Flagged cheaters: ',''], stat_th:'Threshold: > 20 logs',
+  stat_quota:['Logs left today: ',''],
+  fl_notes:'// FIELD NOTES',
+  tip1:'This game has <b>no enemy markers</b>: anyone who calls you through three walls or a smoke screen deserves a log.',
+  tip2:'Cheaters love the <b>Hot Zone</b> (double cash) — crowded objectives are where you meet the same ID twice in one match.',
+  tip3:'<b>Check before logging:</b> one wrong character is a different code, and a log <b>cannot be undone</b>.',
+  tip4:'Logging is anonymous: the server stores salted hashes only — no game ID, and the daily limit uses only a hashed IP.',
+  tip5:'Anti-abuse: <b>max 5 logs per network per day</b> — counts come from different people, not one person clicking.',
+  tip6:'Verdicts are count-based: <b>more than 20 logs flags CHEATER</b>. Not an official ruling.',
+  foot1:'<b>About WARDOGS:</b> a 100-player three-faction (Lonestar / Valkyra / Manticore) combined-arms FPS by BULKHEAD, published by Team17. Control Zones score every 30s; first to 100 wins. Official anti-cheat: Elytra (kernel-level).',
+  foot2:'Real reports go through the <b>in-game Report</b> system (see wardogs.com/enforcement) — only the devs can act on accounts. This site is a player-made public ledger, not a substitute for official reporting.',
+  foot3:'Fan-made tool, not affiliated with or endorsed by BULKHEAD or Team17. WARDOGS and related names are trademarks of their respective owners.',
+  ago:['just now','%d min ago','%d h ago','%d d ago'],
+  empty:'Nothing on the board yet.', tag_susp:'SUSPECT', tag_cheat:'CHEATER', last_pre:'last ',
+  live_registered:(v,c,l,ch)=>'"'+v+'" already logged '+c+' time'+(c===1?'':'s')+(l?' · last '+l:'')+(ch?' · flagged CHEATER':'')+' — no need to log it again, one head counts once',
+  live_similar:(list)=>'On board there are codes 1-2 characters apart: '+list+' — read it twice; a log cannot be undone',
+  need_n:(k)=>k+' character'+(k===1?'':'s')+' short — a code is 7 (4 + 3, e.g. 2VDE-THE)',
+  id_err:'Bad code format: must be 7 characters (4 letters/digits + - + 3 letters/digits, e.g. 2VDE-THE)',
+  e_empty:'Type the code you want to log',
+  e_quota:(k)=>'This network used up today\'s logs ('+k+' per day) — come back tomorrow. Counts need different people, not one person.',
+  e_dup:'You already logged this code', e_fail:'Log failed', e_badreq:'Bad request', e_qfail:'Lookup failed',
+  q_notfound:(v)=>'"'+v+'" has not been logged yet — if you really saw suspicious behaviour, hit "Log as suspect" next to it and it becomes the first entry',
+  q_found:(v,c,t,j,l)=>'"'+v+'" logged '+c+' time'+(c===1?'':'s')+' (threshold '+t+') · verdict: '+j+(l?' · last '+l:''),
+  verdict_cheat:'CHEATER', verdict_susp:'SUSPECT',
+  ok_reg:(v,c,ch)=>ch?('"'+v+'" logged '+c+' times — flagged CHEATER'):('Logged "'+v+'", now at '+c+' suspicion'+(c===1?'':'s')),
+  net_err:(m)=>'Network error: '+m,
+},
+ru: {
+  langattr:'ru',
+  title:'WARDOGS · Реестр подозрительных CODE',
+  desc:'Реестр подозрительных CODE WARDOGS: записывайте 7-символьный код подозрительных игроков из матчей. Если один и тот же код записан больше 20 раз — он помечается как ЧИТЕР.',
+  og_desc:'Ник можно подделать. CODE — нет. Записывайте 7-символьные коды подозрительных игроков: 20+ записей = метка читера.',
+  tw_desc:'Ник можно подделать. CODE — нет. Коды подозрительных игроков здесь; 20+ записей — автоматически читер.',
+  h1_rest:'Реестр подозрительных CODE',
+  sub:'Одна запись = одно подозрение · код, записанный больше <span id="th">20</span> раз → помечается как <b>ЧИТЕР</b>',
+  codetip:'<b>CODE — это</b> <b>7 символов справа от ника игрока в таблице очков</b> (пример: <span class="mono">2VDE-THE</span>). Введите их в поля ниже — тире добавится само.',
+  fl_input:'// ЗАПИСЬ / ПОИСК КОДА',
+  cells_aria:'7-символьный код игрока', cell:(n)=>'символ '+n,
+  btn_query:'Поиск', btn_register:'Записать',
+  msg_hint:'Сначала проверьте: если код уже записан, дублировать не нужно. Если нет — сверьтесь и записывайте.',
+  fl_log:'// ЖУРНАЛ БОЯ',
+  stat_total:['Кодов в реестре: ',''], stat_reg:['Всего записей: ',''],
+  stat_cheat:['Отмечено читеров: ',''], stat_th:'Порог: больше 20 записей',
+  stat_quota:['Записей сегодня осталось: ',''],
+  fl_notes:'// ЗАМЕТКИ С ФРОНТА',
+  tip1:'В этой игре <b>нет маркеров противника</b>: тот, кто видит вас сквозь три стены и дым, заслуживает записи.',
+  tip2:'Читеры любят <b>Hot Zone</b> (двойные деньги) — на горячих точках чаще всего встречаешь один и тот же код дважды за матч.',
+  tip3:'<b>Проверьте перед записью:</b> один символ в сторону — уже другой код, и запись <b>нельзя отменить</b>.',
+  tip4:'Запись анонимна: сервер хранит только солёные хеши — без игрового ID, а суточный лимит использует лишь хеш IP.',
+  tip5:'Анти-накрутка: <b>не больше 5 записей с одной сети в день</b> — счётчик делают разные люди, а не один кликер.',
+  tip6:'Вердикт только по числу: <b>больше 20 записей → метка ЧИТЕР</b>. Это не официальное решение.',
+  foot1:'<b>О WARDOGS:</b> 100-игроковый FPS с тремя фракциями (Lonestar / Valkyra / Manticore) от BULKHEAD, издатель Team17. Control Zone приносят очко каждые 30 с, побеждает набравший 100. Официальный античит — Elytra (уровень ядра).',
+  foot2:'Настоящие жалобы — только через <b>репорт в игре</b> (см. wardogs.com/enforcement): аккаунты банят разработчики. Этот сайт — народный реестр, он не заменяет официальный репорт.',
+  foot3:'Фанатский инструмент, не связан с BULKHEAD и Team17 и не одобрен ими. WARDOGS и связанные названия — товарные знаки их владельцев.',
+  ago:['только что','%d мин назад','%d ч назад','%d дн назад'],
+  empty:'В реестре пока пусто.', tag_susp:'ПОДОЗРИТЕЛЬНЫЙ', tag_cheat:'ЧИТЕР', last_pre:'последняя ',
+  live_registered:(v,c,l,ch)=>'«'+v+'» уже записан '+pl(c,'раз','раза','раз')+(l?' · последняя '+l:'')+(ch?' · помечен ЧИТЕРОМ':'')+' — дублировать не нужно, один человек = одна запись',
+  live_similar:(list)=>'В реестре есть коды, отличающиеся на 1-2 символа: '+list+' — сверьтесь, запись нельзя отменить',
+  need_n:(k)=>'Не хватает '+k+' '+pl(k,'символа','символа','символов')+' — код состоит из 7 (4 + 3, пример: 2VDE-THE)',
+  id_err:'Неверный формат кода: ровно 7 символов (4 буквы/цифры + - + 3 буквы/цифры, например 2VDE-THE)',
+  e_empty:'Введите код, который хотите записать',
+  e_quota:(k)=>'Эта сеть исчерпала дневной лимит записей ('+k+' в день) — приходите завтра. Счётчик делают разные люди.',
+  e_dup:'Вы уже записали этот код', e_fail:'Не удалось записать', e_badreq:'Некорректный запрос', e_qfail:'Ошибка поиска',
+  q_notfound:(v)=>'«'+v+'» ещё никто не записывал — если вы действительно видели подозрительное поведение, нажмите «Записать» рядом, и он станет первой записью',
+  q_found:(v,c,t,j,l)=>'«'+v+'» записан '+pl(c,'раз','раза','раз')+' (порог '+t+') · вердикт: '+j+(l?' · последняя '+l:''),
+  verdict_cheat:'ЧИТЕР', verdict_susp:'ПОДОЗРИТЕЛЬНЫЙ',
+  ok_reg:(v,c,ch)=>ch?('«'+v+'» записан '+pl(c,'раз','раза','раз')+' — помечен ЧИТЕРОМ'):('Записан «'+v+'», сейчас '+pl(c,'подозрение','подозрения','подозрений')+' '+c),
+  net_err:(m)=>'Ошибка сети: '+m,
+  plural:true,
+},
+};
+
+// 俄语复数：1 раз / 2 раза / 5 разов
+function plural(n, one, few, many){
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+window.pl = function(n, a, b, c){ return I18N[LANG].plural ? plural(n, a, b, c) : (n === 1 ? a : b); };
+
+function detectLang(){
+  const u = new URLSearchParams(location.search).get('lang');   // ?lang= 最优先（分享链接能指定语言）
+  if (u && I18N[u]) return u;
+  const saved = localStorage.getItem('lang');                   // 其次记住用户上次选的语言
+  if (saved && I18N[saved]) return saved;
+  const nav = (navigator.language || 'zh').toLowerCase();       // 首次访问按浏览器语言
+  if (nav.startsWith('ru')) return 'ru';
+  if (nav.startsWith('zh')) return 'zh';
+  return 'en';
+}
+let LANG = detectLang();
+const T = () => I18N[LANG];
+
+// 统计行/副标题这类「数字夹在文字里」的节点：固定骨架 + 只换文本槽
+function statSpan(ids, parts, numId){
+  const el = $(ids);
+  el.textContent = '';
+  const a = document.createTextNode(parts[0]);
+  const b = document.createElement('b'); b.id = numId; b.textContent = '0';
+  const c = document.createTextNode(parts[1]);
+  el.append(a, b, c);
+}
+
+function applyLang(lang){
+  LANG = lang;
+  localStorage.setItem('lang', lang);
+  const t = T();
+  document.documentElement.setAttribute('lang', t.langattr);
+  document.title = t.title;
+  $('meta[name="description"]').setAttribute('content', t.desc);
+  $('meta[property="og:title"]').setAttribute('content', 'WARDOGS ' + t.h1_rest);
+  $('meta[property="og:description"]').setAttribute('content', t.og_desc);
+  $('meta[name="twitter:title"]').setAttribute('content', 'WARDOGS ' + t.h1_rest);
+  $('meta[name="twitter:description"]').setAttribute('content', t.tw_desc);
+  $$('[data-i18n]').forEach(el => { const k = el.getAttribute('data-i18n'); if (typeof t[k] === 'string') el.textContent = t[k]; });
+  $$('[data-i18n-html]').forEach(el => { const k = el.getAttribute('data-i18n-html'); if (typeof t[k] === 'string') el.innerHTML = t[k]; });
+  entry.cells.forEach((c, i) => c.setAttribute('aria-label', t.cell(i + 1)));
+  $('#idcells').setAttribute('aria-label', t.cells_aria);
+  statSpan('#w-total', t.stat_total, 's-total');
+  statSpan('#w-reg', t.stat_reg, 's-reg');
+  statSpan('#w-cheat', t.stat_cheat, 's-cheat');
+  $('#w-th').textContent = t.stat_th;
+  statSpan('#s-quota-wrap', t.stat_quota, 's-quota');
+  $('#s-quota-wrap').hidden = true;
+  setMsg('');
+  $('#sim').innerHTML = '';
+  render(DATA);
+  liveHint();
+  $$('.langsw button').forEach(b => b.classList.toggle('on', b.getAttribute('data-lang') === lang));
+}
+
+// ---------- 数据与渲染 ----------
 let DATA = { list: [] };            // 最近一次的 /api/list，供实时提示用（不再发请求）
 
 function ago(ts){
   if(!ts) return '';
+  const t = T().ago;
   const s = Math.max(0, Date.now()/1000 - ts);
-  if(s < 90) return '刚刚';
-  if(s < 3600*6) return Math.round(s/60) + ' 分钟前';
-  if(s < 86400*2) return Math.round(s/3600) + ' 小时前';
-  if(s < 86400*30) return Math.round(s/86400) + ' 天前';
-  const t = new Date(ts*1000);
-  return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  if(s < 90) return t[0];
+  if(s < 3600*6) return sprintf(t[1], Math.round(s/60));
+  if(s < 86400*2) return sprintf(t[2], Math.round(s/3600));
+  if(s < 86400*30) return sprintf(t[3], Math.round(s/86400));
+  const d = new Date(ts*1000);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+function sprintf(fmt, n){ return fmt.replace('%d', n); }
 
-// 只差 1~2 个字符的已登记 code：错一位就是把罪证记到别人头上
+// 只差 1~2 个字符的已登记 code：错一位登记，罪证就落到别人头上 —— 提前提示
 function similarTo(v){
   const out = [];
   for(const r of DATA.list){
@@ -476,27 +678,25 @@ function liveHint(){
   const sim = $('#sim');
   const v = entry.id();
   if(entry.value().length < 7 || !ID_RE.test(v)){ sim.innerHTML = ''; return; }
+  const t = T();
   const mine = DATA.list.find(r => r.id === v);
   const near = similarTo(v);
   let html = '';
   if(mine){
-    html += `「<span class="mono">${esc(v)}</span>」已被登记 <b>${mine.count}</b> 次`
-         + (mine.last ? ' · 最近 ' + ago(mine.last) : '')
-         + (mine.cheater ? ' · <b>已判定外挂</b>' : '')
-         + ' —— 不用再登记，一个人头只能算一次';
+    html += t.live_registered('<span class="mono">' + esc(v) + '</span>', mine.count,
+                              mine.last ? ago(mine.last) : '', mine.cheater);
   }
   if(near.length){
-    html += (html ? '<br>' : '')
-      + '板上还有只差 1~2 个字符的 <span class="mono">'
-      + near.map(r => esc(r.id) + '(' + r.count + ')').join('、')
-      + '</span> —— 看清再登记，登记了没法撤回';
+    const list = '<span class="mono">' + near.map(r => esc(r.id) + '(' + r.count + ')').join(', ') + '</span>';
+    html += (html ? '<br>' : '') + t.live_similar(list);
   }
   sim.innerHTML = html;
 }
 
 function render(d){
   DATA = d;
-  $('#th').textContent = d.threshold;
+  const t = T();
+  const th = $('#th'); if(th) th.textContent = d.threshold;
   $('#s-total').textContent = d.total;
   $('#s-reg').textContent = (typeof d.registrations === 'number')
     ? d.registrations : d.list.reduce((a,r) => a + r.count, 0);
@@ -508,15 +708,15 @@ function render(d){
     qw.hidden = true;
   }
   const el = $('#list');
-  if(!d.list.length){ el.innerHTML = '<div class="empty">还没有人上榜。</div>'; return; }
+  if(!d.list.length){ el.innerHTML = '<div class="empty">' + esc(t.empty) + '</div>'; return; }
   el.innerHTML = d.list.map(r => {
     const pct = Math.min(100, r.count / d.threshold * 100);
     return `<li class="${r.cheater?'cheat':''}">
       <span class="name">${esc(r.id)}</span>
       ${r.cheater?'<span class="stamp">CHEATER</span>':''}
       <span class="cnt">${r.count} / ${d.threshold}</span>
-      <span class="tag ${r.cheater?'cheat':'susp'}">${r.cheater?'外挂':'可疑ID'}</span>
-      <span class="ago">${r.last ? '最近 ' + ago(r.last) : ''}</span>
+      <span class="tag ${r.cheater?'cheat':'susp'}">${esc(r.cheater?t.tag_cheat:t.tag_susp)}</span>
+      <span class="ago">${r.last ? esc(t.last_pre + ago(r.last)) : ''}</span>
       <span class="bar"><i style="width:${pct}%"></i></span>
     </li>`;
   }).join('');
@@ -580,15 +780,23 @@ async function refresh(){
 }
 
 const ID_RE = /^[A-Z0-9]{4}-[A-Z0-9]{3}$/;   // 严格 7 位，与后端 ID_RE 同一套
-const ID_ERR = 'ID 格式不对：必须是 7 位（4 位字母/数字 + - + 3 位字母/数字，如 2VDE-THE）';
-const HINT = '先查一眼：已经有人登记过就不用再填；没查到的话，看清了就直接登记。';
-function setMsg(text, cls){ const m = $('#msg'); m.className = 'msg' + (cls ? ' ' + cls : ''); m.textContent = text || HINT; }
+function setMsg(text, cls){ const m = $('#msg'); m.className = 'msg' + (cls ? ' ' + cls : ''); m.textContent = text || T().msg_hint; }
+
+// 后端错误 {error, err_key}：err_key 是本表里的键，文案按当前语言现译
+const EKEY = { empty:'e_empty', quota:'e_quota', dup:'e_dup', fail:'e_fail', badreq:'e_badreq', id:'id_err' };
+function errText(d){
+  const t = T();
+  const k = d && d.err_key;
+  if(k === 'quota') return t.e_quota(d.cap || 5);
+  if(k && EKEY[k]) return t[EKEY[k]];
+  return (d && d.error) || t.e_fail;
+}
 
 async function submit(){
   const v = idFromCells();
   const n = cellsValue().length;
-  if(n < 7){ setMsg('还差 ' + (7 - n) + ' 位 —— 一共 7 位（4 位 + 3 位，例：2VDE-THE）', 'err'); focusCell(n); return; }
-  if(!ID_RE.test(v)){ setMsg(ID_ERR, 'err'); return; }
+  if(n < 7){ setMsg(T().need_n(7 - n), 'err'); focusCell(n); return; }
+  if(!ID_RE.test(v)){ setMsg(T().id_err, 'err'); return; }
   $('#btn').disabled = true;
   try{
     if(!FP) FP = fingerprint();
@@ -598,18 +806,16 @@ async function submit(){
     });
     const d = await r.json();
     if(!r.ok){
-      setMsg(d.error || '登记失败', d.dup ? 'warn' : 'err');
+      setMsg(errText(d), d.dup ? 'warn' : 'err');
     }
     else{
-      setMsg(d.cheater
-        ? `「${d.id}」已登记 ${d.count} 次 —— 判定为外挂 · CHEATER`
-        : `已登记「${d.id}」，当前 ${d.count} 次怀疑`);
+      setMsg(T().ok_reg(d.id, d.count, d.cheater));
       entry.clear();
       entry.focus(0);
       liveHint();
     }
     await refresh();
-  }catch(e){ setMsg('网络错误：' + e.message, 'err'); }
+  }catch(e){ setMsg(T().net_err(e.message), 'err'); }
   $('#btn').disabled = false;
 }
 
@@ -651,7 +857,7 @@ function boxInputs(boxId, onEnter, onType){
       if(e.key.length === 1){                                     // 可打印键：拦下默认行为，页面自己填
         e.preventDefault();                                       // ← 输入法拿不到这个键，就不会弹候选窗
         const ch = e.key.toUpperCase();
-        if(!/[A-Z0-9]/.test(ch)) return;                          // 横线/中文/符号一律丢掉；只认英文数字
+        if(!/[A-Z0-9]/.test(ch)) return;                          // 横线/西里尔/符号一律丢掉；只认英文数字
         cells[i].value = ch;
         onType();
         obj.focus(i + 1);
@@ -665,25 +871,26 @@ async function query(){
   const msg = $('#msg');
   const v = entry.id();
   const n = entry.value().length;
-  if(n < 7){ setMsg('还差 ' + (7 - n) + ' 位 —— 一共 7 位（4 位 + 3 位，例：2VDE-THE）', 'err'); entry.focus(n); return; }
-  if(!ID_RE.test(v)){ setMsg(ID_ERR, 'err'); return; }
+  const t = T();
+  if(n < 7){ setMsg(t.need_n(7 - n), 'err'); entry.focus(n); return; }
+  if(!ID_RE.test(v)){ setMsg(t.id_err, 'err'); return; }
   $('#qbtn').disabled = true;
   try{
     const r = await fetch('/api/query?id=' + encodeURIComponent(v));
     const d = await r.json();
-    if(!r.ok){ msg.className='msg err'; msg.textContent = d.error || '查询失败'; }
+    if(!r.ok){ msg.className='msg err'; msg.textContent = d.error ? errText(d) : t.e_qfail; }
     else if(!d.found){
       msg.className='msg warn';
-      msg.textContent = `「${d.id}」还没有被登记过 —— 如果你确实看到了可疑行为，点旁边的「登记为可疑」，它就是第一条`;
+      msg.textContent = t.q_notfound(d.id);
     }
     else{
       msg.className = d.cheater ? 'msg err' : 'msg ok';
-      msg.innerHTML = `「<span class="qres">${esc(d.id)}</span>」已被登记 <b>${d.count}</b> 次`
-                    + `（阈值 ${d.threshold}）· 判定：<b>${d.cheater ? '外挂' : '可疑ID'}</b>`
-                    + (d.last ? ` · 最近 ${ago(d.last)}` : '');
+      msg.innerHTML = t.q_found('<span class="qres">' + esc(d.id) + '</span>', d.count, d.threshold,
+                                d.cheater ? t.verdict_cheat : t.verdict_susp,
+                                d.last ? ago(d.last) : '');
     }
     liveHint();
-  }catch(e){ msg.className='msg err'; msg.textContent='网络错误：'+e.message; }
+  }catch(e){ msg.className='msg err'; msg.textContent=T().net_err(e.message); }
   $('#qbtn').disabled = false;
 }
 
@@ -696,6 +903,9 @@ const focusCell = entry.focus;
 
 $('#btn').addEventListener('click', submit);
 $('#qbtn').addEventListener('click', query);
+$$('.langsw button').forEach(b => b.addEventListener('click', () => applyLang(b.getAttribute('data-lang'))));
+
+applyLang(LANG);                             // 先按浏览器语言整页换词，再谈自动聚焦
 // 触屏一进页面就聚焦会立刻糊上来一个键盘挡住半屏 —— 只在有实体键盘的设备上自动聚焦
 if(!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) focusCell(0);
 refresh();
@@ -703,6 +913,7 @@ setInterval(refresh, 5000);
 </script>
 </body>
 </html>
+
 """
 
 
@@ -770,7 +981,7 @@ class Handler(BaseHTTPRequestHandler):
             q = urllib.parse.parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
             name = format_id((q.get("id") or [""])[0])
             if not ID_RE.fullmatch(name):
-                self._json({"error": ID_ERR, "found": False}, 400)
+                self._json({"error": ID_ERR, "err_key": "id", "found": False}, 400)
                 return
             with _lock:
                 rec = _state["ids"].get(name.lower())
@@ -815,13 +1026,14 @@ class Handler(BaseHTTPRequestHandler):
             raw = payload.get("id", "")
             fp = payload.get("fp", "")
         except Exception:
-            self._json({"error": "请求格式错误"}, 400)
+            self._json({"error": "请求格式错误", "err_key": "badreq"}, 400)
             return
-        result, err, dup = register(raw, sid=sid, fp=fp, ip=self._client_ip())
+        result, err, dup, ekey = register(raw, sid=sid, fp=fp, ip=self._client_ip())
         if result:
             self._json(result)
         else:
-            self._json({"error": err, "dup": dup}, 409 if dup else 400)
+            self._json({"error": err, "dup": dup, "err_key": ekey,
+                        "cap": DAILY_CAP, "threshold": THRESHOLD}, 409 if dup else 400)
 
 
 def main() -> None:

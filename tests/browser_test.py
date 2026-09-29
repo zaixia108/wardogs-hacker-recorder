@@ -255,7 +255,7 @@ def _run() -> None:
         ws.call("Network.enable")
         ws.call("Network.clearBrowserCookies")      # 每次都从干净身份开始
         time.sleep(0.3)
-        ws.call("Page.navigate", {"url": BASE + "/"})
+        ws.call("Page.navigate", {"url": BASE + "/?lang=zh"})
         for _ in range(60):
             time.sleep(0.25)
             if ws.js("document.readyState") == "complete":
