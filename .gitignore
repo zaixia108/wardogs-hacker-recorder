@@ -10,6 +10,8 @@ remote.py
 __pycache__/
 *.pyc
 *.png
+# 例外：社交分享卡是仓库资产，必须入库（deploy.sh/CI 都要用它）
+!og.png
 
 # 手改前的就地备份（别入库）
 server.py.pre-*

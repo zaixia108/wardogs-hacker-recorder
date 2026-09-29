@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - "server.py"
+      - "og.png"
+      - "og.png"
       - "seed_counts.py"
       - "README.md"
       - "tests/**"
@@ -49,6 +51,9 @@ jobs:
           echo "首页 HTTP $code"
           test "$code" = "200" || { echo "::error::首页没返回 200"; exit 1; }
           grep -q 'class="cell"' /tmp/page.html || { echo "::error::首页里没有登记方框，页面可能没起来"; exit 1; }
+          ctype=$(curl -s -o /dev/null -w '%{content_type}' --max-time 20 "${SITE%/}/og.png")
+          echo "og.png content-type: $ctype"
+          test "$ctype" = "image/png" || { echo "::error::og.png 不是 PNG，分享卡会挂"; exit 1; }
           curl -s --max-time 20 "${SITE%/}/api/list" > /tmp/list.json
           python3 - <<'PY'
           import json

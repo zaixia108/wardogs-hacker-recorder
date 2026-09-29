@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#232a1c"/>
+      <stop offset="1" stop-color="#151a10"/>
+    </linearGradient>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M60 0H0V60" fill="none" stroke="#3a4530" stroke-width="1" opacity="0.35"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <rect x="0" y="0" width="1200" height="10" fill="#c8a54a"/>
+  <rect x="0" y="620" width="1200" height="10" fill="#c8a54a"/>
+
+  <text x="80" y="120" font-family="WenQuanYi Zen Hei, sans-serif" font-size="30" letter-spacing="6" fill="#8a9678">// WARDOGS · FIELD RECORD</text>
+
+  <text x="80" y="235" font-family="WenQuanYi Zen Hei, sans-serif" font-weight="700" font-size="82" fill="#e8e4d8">可疑ID 登记处</text>
+
+  <!-- 7 格方框示意 -->
+  <g font-family="DejaVu Sans Mono, monospace" font-size="64" font-weight="700" text-anchor="middle">
+    <rect x="80"  y="290" width="88" height="110" rx="8" fill="#1a2013" stroke="#c8a54a" stroke-width="3"/>
+    <rect x="180" y="290" width="88" height="110" rx="8" fill="#1a2013" stroke="#c8a54a" stroke-width="3"/>
+    <rect x="280" y="290" width="88" height="110" rx="8" fill="#1a2013" stroke="#c8a54a" stroke-width="3"/>
+    <rect x="380" y="290" width="88" height="110" rx="8" fill="#1a2013" stroke="#c8a54a" stroke-width="3"/>
+    <rect x="480" y="290" width="60" height="110" rx="8" fill="#242c1c" stroke="#5a6850" stroke-width="2"/>
+    <rect x="560" y="290" width="88" height="110" rx="8" fill="#1a2013" stroke="#5a6850" stroke-width="3"/>
+    <rect x="660" y="290" width="88" height="110" rx="8" fill="#1a2013" stroke="#5a6850" stroke-width="3"/>
+    <rect x="760" y="290" width="88" height="110" rx="8" fill="#1a2013" stroke="#5a6850" stroke-width="3"/>
+    <text x="124" y="368" fill="#e8e4d8">2</text>
+    <text x="224" y="368" fill="#e8e4d8">V</text>
+    <text x="324" y="368" fill="#e8e4d8">D</text>
+    <text x="424" y="368" fill="#e8e4d8">E</text>
+    <text x="510" y="362" fill="#7a8470" font-size="48">-</text>
+    <text x="604" y="368" fill="#9aa38c">T</text>
+    <text x="704" y="368" fill="#9aa38c">H</text>
+    <text x="804" y="368" fill="#9aa38c">E</text>
+  </g>
+  <text x="890" y="335" font-family="WenQuanYi Zen Hei, sans-serif" font-size="26" fill="#8a9678">积分版上名字右侧</text>
+  <text x="890" y="375" font-family="WenQuanYi Zen Hei, sans-serif" font-size="26" fill="#8a9678">那 7 个字符</text>
+
+  <!-- CHEATER 印章 -->
+  <g transform="translate(1005,345) rotate(-14)">
+    <rect x="-145" y="-52" width="290" height="104" rx="10" fill="none" stroke="#b03a2e" stroke-width="6" opacity="0.9"/>
+    <text x="0" y="18" font-family="DejaVu Sans, sans-serif" font-weight="700" font-size="46" letter-spacing="6" text-anchor="middle" fill="#b03a2e" opacity="0.9">CHEATER</text>
+  </g>
+
+  <text x="80" y="490" font-family="WenQuanYi Zen Hei, sans-serif" font-size="44" font-weight="700" fill="#c8a54a">名字可以顶，CODE 顶不掉。</text>
+  <text x="80" y="555" font-family="WenQuanYi Zen Hei, sans-serif" font-size="30" fill="#9aa38c">同一个 code 超过 20 次 → 自动标红外挂 · fxxkwghackers.zaixia108.com</text>
+</svg>

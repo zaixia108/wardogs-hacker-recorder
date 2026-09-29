@@ -40,6 +40,7 @@ echo "  现在线上 ${BEFORE} 条登记"
 
 say "推代码"
 send server.py "$APP_DIR"
+send og.png "$APP_DIR"
 send seed_counts.py "$APP_DIR"
 send README.md "$APP_DIR"
 for f in tests/*.py; do send "$f" "$APP_DIR/tests"; done

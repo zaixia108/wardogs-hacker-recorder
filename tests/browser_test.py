@@ -6,7 +6,8 @@
   2. 身份 cookie 是服务端下发的 HttpOnly cookie
   3. 输入全角 ID → 输入框里当场被格式化成半角大写
   4. 点登记 → 成功；再点一次 → 被拦（同一浏览器只能登记一次）
-  5. 用 CDP 清掉 cookie 再点 → 仍然被拦（指纹兜底）
+  5. 一组方框两种动作：查询/登记共用输入；填满 7 格当场给「已登记几次 / 相似 code」提示
+  6. 用 CDP 清掉 cookie 再点 → 仍然被拦（指纹兜底）
 
 用法: chromium --headless=new --remote-debugging-port=9222 ... &
       /usr/bin/python3 tests/browser_test.py [BASE_URL] [CDP_PORT]
@@ -195,13 +196,13 @@ def do_register(ws, value):
 
 
 def do_query(ws, value):
-    """在查询框里填好再点查询，等提示变化后返回文案。"""
-    clear_cells(ws, "qcells")
-    paste_id(ws, value, "qcells")
+    """同一组方框：填好点查询，等提示变化后返回文案。"""
+    clear_cells(ws)
+    paste_id(ws, value)
     time.sleep(0.3)
-    prev = msg_text(ws, "#qmsg")      # 同上：粘贴后重新取基准
+    prev = msg_text(ws)               # 同上：粘贴后重新取基准
     ws.js("document.querySelector('#qbtn').click()")
-    return wait_msg(ws, "#qmsg", prev)
+    return wait_msg(ws, "#msg", prev)
 
 
 def my_row(ws, tid):
@@ -287,8 +288,8 @@ def _run() -> None:
         check(f"拼出来的 ID 是 {TID}", ws.js("idFromCells()") == TID, ws.js("idFromCells()"))
         check("横线是中间那格（第 5 个位置）", ws.js(
             "[...document.querySelector('#idcells').children].findIndex(e=>e.classList.contains('dash'))") == 4)
-        check("查询框排在登记框下面、列表上面", ws.js(
-            "[...document.querySelectorAll('#idcells,#qcells,#list')].map(e=>e.id).join(',')") == "idcells,qcells,list")
+        check("一组方框带两个按钮，排在列表上面", ws.js(
+            "[...document.querySelectorAll('#idcells,#qbtn,#btn,#list')].map(e=>e.id).join(',')") == "idcells,qbtn,btn,list")
 
         print(f"\n[4] 第一次登记（就用格子里拼好的 {TID}）")
         msg = wait_msg(ws, "#msg", "")
@@ -333,38 +334,104 @@ def _run() -> None:
         check("提示还差 3 位", "还差 3 位" in msg, msg)
         check("列表没多出条目", my_row(ws, TID2) == row2, my_row(ws, TID2))
 
-        print("\n[9] 查询框和登记框是同一套方框（横线也自动带）")
-        check("查询框也是 7 格", ws.js("document.querySelectorAll('#qcells .cell').length") == 7,
-              ws.js("document.querySelectorAll('#qcells .cell').length"))
-        check("查询框的横线也在中间那格", ws.js(
-            "[...document.querySelector('#qcells').children].findIndex(e=>e.classList.contains('dash'))") == 4)
-        type_keys(ws, fullwidth(TID.replace("-", "")), "qcells")
-        check(f"查询框逐格输入后拼出 {TID}", ws.js("qry.id()") == TID, ws.js("qry.id()"))
+        print("\n[9] 查询与登记共用一组方框（7 格 + 一根自动横线 + 两个按钮）")
+        check("全页只有 7 个格子", ws.js("document.querySelectorAll('.cell').length") == 7,
+              ws.js("document.querySelectorAll('.cell').length"))
+        check("横线在中间那格", ws.js(
+            "[...document.querySelector('#idcells').children].findIndex(e=>e.classList.contains('dash'))") == 4)
+        check("两个按钮挨在一起", ws.js(
+            "(()=>{const b=document.querySelectorAll('#idcells ~ .btns button, .btns button');"
+            "return [...b].map(x=>x.id).join(',')})()") == "qbtn,btn",
+            ws.js("[...document.querySelectorAll('.btns button')].map(x=>x.id).join(',')"))
+        clear_cells(ws)
+        type_keys(ws, fullwidth(TID.replace("-", "")))
+        check(f"逐格输入后拼出 {TID}", ws.js("entry.id()") == TID, ws.js("entry.id()"))
         time.sleep(0.3)
-        prev = msg_text(ws, "#qmsg")     # 打字也会先清提示
+        prev = msg_text(ws)              # 打字也会先清提示
         ws.js("document.querySelector('#qbtn').click()")
-        q = wait_msg(ws, "#qmsg", prev)
+        q = wait_msg(ws, "#msg", prev)
         check("查询结果显示次数与判定", TID in q and "已被登记" in q and "可疑ID" in q, q)
 
-        print(f"\n[10] 查询没登记过的 ID（整串粘进第一格）：{TID3}")
-        paste_id(ws, TID3, "qcells")
+        print(f"\n[10] 查询没登记过的 code（整串粘进第一格）：{TID3}")
+        clear_cells(ws)
+        paste_id(ws, TID3)
         time.sleep(0.3)
-        prev = msg_text(ws, "#qmsg")
-        check("粘进来的横线不算格子内容", cells_of(ws, "qcells") == TID3.replace("-", ""),
-              repr(cells_of(ws, "qcells")))
+        prev = msg_text(ws)
+        check("粘进来的横线不算格子内容", cells_of(ws) == TID3.replace("-", ""), repr(cells_of(ws)))
         ws.js("document.querySelector('#qbtn').click()")
-        q = wait_msg(ws, "#qmsg", prev)
+        q = wait_msg(ws, "#msg", prev)
         check("提示还没被登记过", "还没有被登记过" in q, q)
+        check("无结果时顺手引导登记", "登记为可疑" in q, q)
 
-        print("\n[11] 查询框只填 3 位就点查询 → 前端拦住并说还差几位")
-        clear_cells(ws, "qcells")
-        type_keys(ws, "ZZZ", "qcells")
+        print("\n[11] 只填 3 位就点查询 → 前端拦住并说还差几位")
+        clear_cells(ws)
+        type_keys(ws, "ZZZ")
         ws.js("document.querySelector('#qbtn').click()")
         time.sleep(0.8)
-        q = ws.js("document.querySelector('#qmsg').textContent")
+        q = ws.js("document.querySelector('#msg').textContent")
         check("提示还差 4 位", "还差 4 位" in q, q)
 
-        print("\n[12] 打字只走英文：可打印按键被页面自己接管（输入法不会被唤醒）")
+        print("\n[12] 填满是 7 格就当场给话（不用点按钮）")
+        clear_cells(ws)
+        paste_id(ws, TID)
+        time.sleep(0.8)
+        sim = ws.js("document.querySelector('#sim').textContent")
+        check("已登记过的 code → 直接显示已被登记几次并劝退", "已被登记" in sim and "不用再登记" in sim, sim)
+        check("同时提示一个人头只能算一次", "一个人" in sim or "只能算一次" in sim, sim)
+        clear_cells(ws)
+        paste_id(ws, TID[:-1] + ("A" if TID[-1] != "A" else "B"))
+        time.sleep(0.8)
+        sim2 = ws.js("document.querySelector('#sim').textContent")
+        check("只差 1 位 → 提醒板上相似的 code 且说清无法撤回",
+              "只差 1~2 个字符" in sim2 and TID in sim2 and "没法撤回" in sim2, sim2)
+        clear_cells(ws)
+        paste_id(ws, "QQQQ-QQQ")
+        time.sleep(0.8)
+        check("毫不相干 → 不瞎提示", ws.js("document.querySelector('#sim').textContent") == "",
+              repr(ws.js("document.querySelector('#sim').textContent")))
+
+        print("\n[13] 列表行带相对时间、统计行带累计次数")
+        row = my_row(ws, TID)
+        check("我这条显示「最近 …」", "最近" in row, row)
+        check("累计登记次数不是 0 且不小于 ID 数",
+              ws.js("Number(document.querySelector('#s-reg').textContent)") >= ws.js(
+                  "Number(document.querySelector('#s-total').textContent)"),
+              ws.js("document.querySelector('#s-reg').textContent"))
+
+        print("\n[14] 社区分享卡")
+        check("og:title / og:description 有内容",
+              bool(ws.js("document.querySelector('meta[property=\\'og:title\\']').content"))
+              and bool(ws.js("document.querySelector('meta[property=\\'og:description\\']').content")),
+              ws.js("document.querySelector('meta[property=\\'og:title\\']').content"))
+
+        print("\n[15] 触屏不自动聚焦（免得一进页面就糊上来一个键盘）")
+        tgt2 = new_tab()
+        ws2 = WS(tgt2["webSocketDebuggerUrl"])
+        try:
+            ws2.call("Page.enable")
+            ws2.call("Emulation.setTouchEmulationEnabled", {"enabled": True, "maxTouchPoints": 5})
+            ws2.call("Emulation.setDeviceMetricsOverride",
+                     {"width": 390, "height": 844, "deviceScaleFactor": 3, "mobile": True})
+            ws2.call("Page.navigate", {"url": BASE + "/"})
+            for _ in range(40):
+                time.sleep(0.25)
+                if ws2.js("document.readyState") == "complete":
+                    break
+            time.sleep(0.6)
+            coarse = ws2.js("window.matchMedia('(pointer: coarse)').matches")
+            focused = ws2.js("document.activeElement.tagName")
+            check("触屏环境下 pointer:coarse 生效（模拟成立才说明测的是这条路径）", coarse is True, coarse)
+            check("触屏下没有自动聚焦到方框（键盘不会弹）", focused != "INPUT", focused)
+            ws2.call("Emulation.clearDeviceMetricsOverride")
+            ws2.call("Emulation.setTouchEmulationEnabled", {"enabled": False})
+        finally:
+            ws2.close()
+            try:
+                requests.get(f"http://127.0.0.1:{CDP_PORT}/json/close/{tgt2['id']}", timeout=5)
+            except Exception:
+                pass
+
+        print("\n[16] 打字只走英文：可打印按键被页面自己接管（输入法不会被唤醒）")
         clear_cells(ws)
         ws.js("document.querySelectorAll('#idcells .cell')[0].focus()")
         ws.js("window.__ime=[];document.addEventListener('keydown',e=>{window.__ime.push([e.key,e.defaultPrevented])},false)")

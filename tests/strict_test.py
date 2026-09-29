@@ -8,7 +8,8 @@
 
 覆盖：后端 ID_RE / 前端 ID_RE（node 真跑）判定一致 · 非法格式被拒且不落盘 ·
 合法格式（含全角、小写、怪横杠）被接受 · /api/query 的已登记/未登记/非法三种情况 ·
-页面文案与控件（查询按钮、maxlength=8）。
+页面文案与控件（一组方框 + 查询/登记两个按钮、OG 分享卡、误伤与防刷说明）·
+每日配额（同一出口 5 次/天，明文 IP 不落盘）· 相似 code 提示。
 """
 from __future__ import annotations
 
@@ -141,17 +142,70 @@ def run(base: str, data_file: str | None) -> None:
     st, d, _ = req("GET", "/api/query")
     check("不带参数 → 400", st == 400, f"实际 {st} {d}")
 
-    print("\n[6] 页面文案与控件")
+    print("\n[6] 页面文案与控件（一组方框 + 查询/登记两个按钮）")
     check("页面上没有「只能登记一次」这句文案", "只能登记一次" not in html)
-    check("登记框和查询框都是 7 个方框", html.count('class="cell"') == 14, str(html.count('class="cell"')))
-    check("两个框各有一根自动带的横线", html.count('class="dash"') == 2, str(html.count('class="dash"')))
-    check("查询按钮在", 'id="qbtn"' in html)
+    check("全页只有 7 个方框", html.count('class="cell"') == 7, str(html.count('class="cell"')))
+    check("只有一根自动带的横线", html.count('class="dash"') == 1, str(html.count('class="dash"')))
+    check("查询按钮和登记按钮都在同一个卡片里",
+          'id="qbtn"' in html and 'id="btn"' in html
+          and html.index('id="idcells"') < html.index('id="qbtn"') < html.index('id="list"'))
+    check("旧的第二个查询框已不存在", 'id="qcells"' not in html and 'id="qmsg"' not in html)
     check("旧的单框输入已不存在", 'id="idbox"' not in html and 'id="qbox"' not in html)
-    check("查询窗口排在登记下面、列表上面",
-          html.index('id="idcells"') < html.index('id="qcells"') < html.index('id="list"'))
     check("不用手打横线（页面有说明）", "横线" in html or "自动" in html)
-    check("手机上给的是拉丁键盘、不给输入法机会", html.count('inputmode="latin"') == 14,
+    check("手机上给的是拉丁键盘、不给输入法机会", html.count('inputmode="latin"') == 7,
           str(html.count('inputmode="latin"')))
+    check("格子有 aria-label（屏幕阅读器读得出第几位）", html.count('aria-label="第 ') == 7,
+          str(html.count('aria-label="第 ')))
+    check("社区分享卡（og:title / og:description / twitter:card）在",
+          all(k in html for k in ('property="og:title"', 'property="og:description"',
+                                  'name="twitter:card"')))
+    check("误伤提醒：登记前核对、无法撤回", "核对" in html and "没法撤回" in html)
+    check("防刷说明写在页面上", "每天" in html and "5 次" in html)
+    check("累计次数与今日余量的挂载点在", 'id="s-reg"' in html and 'id="s-quota"' in html)
+
+    if data_file is not None:      # 只在隔离实例上跑：会真的吃掉配额、写进数据
+        print("\n[7] 每日配额（同一出口每天 5 次，IP 只落加盐哈希）")
+        st, base, _ = req("GET", "/api/list")
+        before = base.get("left_today")
+        check("列表带 daily_cap / left_today",
+              base.get("daily_cap") == 5 and isinstance(before, int) and 1 <= before <= 5,
+              f"cap={base.get('daily_cap')} left={before}")
+        st, d, _ = req("POST", "/api/register", {"id": "SIMX-ABC", "fp": "strict-fp-0020-aaaaaaaa"})
+        check("额度没用完时登记 → 200", st == 200, f"{st} {d}")
+        st, lst, raw = req("GET", "/api/list")
+        check("登记一次 → 余量减一", lst.get("left_today") == before - 1,
+              f"before={before} left={lst.get('left_today')}")
+        check("列表带累计登记次数 registrations",
+              isinstance(lst.get("registrations"), int) and lst["registrations"] >= lst["total"],
+              f"registrations={lst.get('registrations')} total={lst.get('total')}")
+        check("列表行带最近登记时间 last", all(isinstance(r.get("last"), (int, float)) for r in lst["list"]),
+              str(lst["list"][0])[:120])
+        st, mid, _ = req("GET", "/api/list")
+        drain = mid.get("left_today")
+        for i in range(drain):            # 把当天余量正好用光
+            st, d, _ = req("POST", "/api/register",
+                           {"id": f"QUTA-{i:03d}", "fp": f"strict-fp-0021-{i:08d}"})
+            check(f"用掉第 {i + 1}/{drain} 份余量 → 200", st == 200, f"{st} {d}")
+        st, d, _ = req("POST", "/api/register", {"id": "QUTB-AAA", "fp": "strict-fp-0022-aaaaaaaa"})
+        check("超额登记 → 400 且说明登记满了",
+              st == 400 and "登记满" in (d.get("error") or ""), f"{st} {d}")
+        st, lst, _ = req("GET", "/api/list")
+        check("满了以后 left_today=0，且垃圾条目没被建出来",
+              lst.get("left_today") == 0 and "qutb-aaa" not in [r["id"].lower() for r in lst["list"]],
+              f"left={lst.get('left_today')}")
+        with open(data_file, encoding="utf-8") as fp:
+            disk = fp.read()
+        check("明文 IP 没有落盘", "127.0.0.1" not in disk and "::1" not in disk, "")
+        check("配额桶用的是哈希而不是 IP", '"quota"' in disk and "127.0.0.1" not in disk.split('"quota"')[1][:400], "")
+
+        print("\n[8] 相似 code 提示（错一位就是另一个人）")
+        st, d, _ = req("GET", "/api/query?id=SIMX-ABD")
+        sims = [s.get("id") for s in (d.get("similar") or [])]
+        check("查询只差 1 位的 code → similar 里有 SIMX-ABC",
+              st == 200 and "SIMX-ABC" in sims, f"{st} {sims}")
+        st, d, _ = req("GET", "/api/query?id=ZZZZ-ZZZ")
+        check("毫不相干的 code → similar 为空", d.get("similar") == [], str(d.get("similar")))
+        check("查询返回 last 字段", isinstance(d.get("last"), (int, float)), str(d))
 
     print(f"\n=== 结果: {len(OK)} 通过 / {len(FAIL)} 失败 ===")
     if FAIL:
