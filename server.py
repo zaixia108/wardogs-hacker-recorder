@@ -14,6 +14,7 @@ ID 严格 7 位：^[A-Z0-9]{4}-[A-Z0-9]{3}$（如 2VDE-THE），不合规直接�
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
@@ -917,6 +918,20 @@ setInterval(refresh, 5000);
 """
 
 
+def _inline_script_hashes() -> list[str]:
+    """页面内联脚本的 CSP 哈希白名单。页面是静态常量，导入时算一次就够。"""
+    out = []
+    for body in re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", PAGE, re.S | re.I):
+        digest = base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode()
+        out.append(f"'sha256-{digest}'")
+    return out
+
+
+# 只允许本站自己的脚本执行。边缘被塞进 <script>（2026-09-30 那次 Cloudflare Worker 注入）
+# 时浏览器直接拒绝执行，访客不会被二次伤害。改页面内联脚本时哈希会自动重算，不用手工同步。
+CSP = "script-src 'self' " + " ".join(_inline_script_hashes())
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "SuspectID/1.1"
     _set_cookie: str | None = None
@@ -956,6 +971,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Security-Policy", CSP)
         if self._set_cookie:
             self.send_header("Set-Cookie", self._set_cookie)
             self._set_cookie = None
